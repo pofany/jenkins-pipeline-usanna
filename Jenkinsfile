@@ -1,23 +1,35 @@
 pipeline {
     agent any
+    triggers {
+        pollSCM('H/2 * * * *')
+    }
     stages {
         stage('Build') {
             steps {
                 echo 'Building Docker image...'
-                sh 'docker build -t myapp:latest .' // Локальна збірка Docker-образу
+                sh 'docker build -t usapp:latest .'
             }
         }
         stage('Test') {
             steps {
                 echo 'Running tests...'
-                sh 'echo "Tests passed!"' // Можна додати реальні тести
+                sh 'docker run --rm usapp:latest'
             }
         }
         stage('Deploy') {
             steps {
-                echo 'Deploy stage (локально)'
-                sh 'docker images' // Перевірка створеного Docker-образу
+                echo 'Pushing Docker image to DockerHub...'
+                withCredentials([usernamePassword(credentialsId: 'dockerhub-credentials', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+                    sh 'echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin'
+                    sh 'docker tag usapp:latest $DOCKER_USER/usapp:latest'
+                    sh 'docker push $DOCKER_USER/usapp:latest'
+                }
             }
+        }
+    }
+    post {
+        always {
+            sh 'docker logout || true'
         }
     }
 }
